@@ -105,7 +105,6 @@ Flow:
 - `notificationContentMode: NOTIFICATION_CONTENT_MODE`
 - `sendMessageSound: boolean`
 - `receiveMessageSound: boolean`
-- `notificationSound: boolean`
 - `privateMessageSound: boolean`
 - `groupMessageSound: boolean`
 - `systemNotificationSound: boolean`
