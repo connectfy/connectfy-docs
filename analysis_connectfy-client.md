@@ -287,8 +287,28 @@ connectfy-client/
 *   **Messenger Workflows**: `MESSENGER`, `GROUPS`, and `CHANNELS` are defined in the Enums and sidebar UI, but heavily detailed modules inside `/modules` (like we saw for settings and users) weren't prominently dumped, implying messaging components might be in a different un-dumped structure or heavily WIP.
 *   **Face Descriptor**: `FACE_DESCRIPTOR: "/auth/face-descriptor"` hints at an upcoming or WIP biometric login feature (e.g. face ID verification).
 
+## COLOR SCHEMA
+```css
+:root {
+  --primary-color: #2ecc71;
+  --secondary-color: #f5f5f5;
+  --text-color: #2d3436;
+  --bg-color: #ffffff;
+  --hover-bg: #27ae60;
+  --toggle-bg: #cccccc;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --skeleton-color: #c1c1c1;
+}
 
-
+[data-theme="dark"] {
+  --secondary-color: #36393f;
+  --text-color: #f0f0f0;
+  --bg-color: #202225;
+  --toggle-bg: #4a4a4a;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --skeleton-color: #4a4a4a;
+}
+```
 
 ## PROJECT IMAGES
 ![alt text](image.png)
@@ -312,3 +332,4 @@ connectfy-client/
 ![alt text](image-18.png)
 ![alt text](image-19.png)
 ![alt text](image-20.png)
+![alt text](icon.svg)
