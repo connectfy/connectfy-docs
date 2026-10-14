@@ -36,13 +36,15 @@ connectfy-notification-action-history/
 ### Process model
 
 `main.ts` boots one Nest application with two transports attached (`connectMicroservice`): a
-Kafka consumer (custom `LoggingKafkaServer`, which logs registered topics missing on the broker)
-and TCP on `PORT` (7000). A global `ValidationPipe({ whitelist: true, transform: true })` applies
-to **both** transports.
+Kafka consumer (`connectfy-shared`'s `DeadLetterKafkaServer`, which also logs registered topics
+missing on the broker) and TCP on `PORT` (7000). A global
+`ValidationPipe({ whitelist: true, transform: true })` applies to **both** transports.
 
 Kafka uses `autoCommit: false`. Every handler wraps its work in `consumeKafkaEvent` (from
-`connectfy-shared`), which commits even when the handler fails, so one bad message can't stall
-a partition. A payload the pipe rejects is the exception (see Notes).
+`connectfy-shared`). A transient failure is retried up to 5 times. A message that can't be
+applied goes to `kafka.dead-letter` first and is only then committed, so one bad message can't
+stall a partition. This covers a payload the pipe rejects, a permanent handler error and an
+exhausted retry budget (see Notes).
 
 ### Email flow
 
@@ -148,11 +150,14 @@ Redis (cache), `connectfy-shared`, `connectfy-i18n`.
 
 ## Notes
 
-- **Known gap:** a payload the `ValidationPipe` rejects fails *before* the handler
-  runs, is never committed, and is retried forever, stalling its partition. A dead-letter queue is
-  planned (see `claude/docs/versions/v1.63.0_group_join_requests.md`, START HERE). Until then, a
-  Kafka DTO must accept every payload its producer can send. In particular, `FieldValidator`'s
-  ARRAY type rejects an empty array even on an optional field.
+- **Dead letters** (since 2026-10-14, shared 0.0.170): a payload the `ValidationPipe` rejects
+  fails *before* the handler runs. `DeadLetterKafkaServer` still catches it: it writes the raw
+  message with `x-dlq-*` headers to `kafka.dead-letter` (reason `rejected`) and commits. If that
+  write fails, nothing is committed and the message is redelivered. List or replay the records
+  with `connectfy-config/kafka/replay-dead-letter.sh`. A Kafka DTO should still accept every
+  payload its producer can send: a rejected message is set aside, not applied. Note that
+  `FieldValidator`'s ARRAY type rejects an empty array even on an optional field. Design:
+  `claude/docs/plans/kafka_dead_letter_plan.md`.
 - `autoIndex` is off in production, so new indexes (e.g. `uniq_group_join_requests_row`) must be
   built there explicitly.
 - Updated 2026-10-13. The previous version described the notification module as "in
