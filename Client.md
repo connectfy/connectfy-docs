@@ -61,6 +61,7 @@ There are no persistence entities in the client. Important runtime models are:
 - Profile view and profile editing
 - User search, friend requests, friends list, external user profile view
 - General, privacy, notification, account, and background settings
+- Activity log (since 2026-10-15): the user's own actions, shown at Settings → "Activity log" and in a modal from the profile's Security card. Both use the same `ActivityLogView`.
 - Messenger shell and navigation
 - Global modal system, skeleton loaders, and context menus
 
@@ -71,6 +72,7 @@ The client consumes API Gateway endpoints. Main groups:
 - Profile and settings: `/account/*`
 - Friendship actions: `/relationship/friendship/*`
 - File uploads: `/files/presigned-upload`
+- Activity log: `GET /notification-action-history/activity?order=&categories=&cursor=` (`profileApi.getActivityLog`, an RTK `infiniteQuery`)
 
 Main routes:
 - `/auth`, `/auth/login`, `/auth/signup`
@@ -79,7 +81,7 @@ Main routes:
 - `/messenger`
 - `/profile`
 - `/users`, `/users/search`, `/users/friends`, `/users/requests`, `/users/profile/:id`
-- `/settings`, `/settings/general`, `/settings/account`, `/settings/privacy`, `/settings/notification`, `/settings/background`
+- `/settings`, `/settings/general`, `/settings/account`, `/settings/privacy`, `/settings/notification`, `/settings/background`, `/settings/activity-log`
 - `/terms-and-conditions`
 
 ## Technologies Used
@@ -98,3 +100,4 @@ Main routes:
 - Access tokens are stored client-side; refresh tokens stay in cookies.
 - `RequireAuth`, `InsideProfile`, and `RedirectMain` control most navigation rules.
 - The route tree is feature-based, so new screens should usually be added through a feature module plus `routes/router.tsx`.
+- `modules/settings/ActivityLog/types/types.ts` mirrors connectfy-shared's `UserActivityAction` by hand (the client doesn't import that package), so a new server action must be added there too, with a phrase and an icon in `utils/activityLog.ts` and an `activity_log.*` i18n key.

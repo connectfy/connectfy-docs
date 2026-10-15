@@ -2,7 +2,7 @@
 
 ## Overview
 
-`connectfy-notification-action-history` owns two things:
+`connectfy-notification-action-history` owns three things:
 
 1. **Transactional email.** It consumes `mail.send` (from `connectfy-auth`) and sends the mail
    over SMTP, deduplicated by `mailId`.
@@ -10,6 +10,11 @@
    MongoDB. Producers publish events to Kafka; this service writes the rows and publishes
    `notification.created` / `notification.removed`, which `connectfy-api-gateway` pushes to the
    recipient's sockets. The gateway reads and changes the inbox over TCP.
+3. **The user activity log** (since 2026-10-15). It holds each user's own actions: sign-ins,
+   credential changes, profile and privacy edits, friend requests, blocks and group membership.
+   Every producer publishes `activity.recorded` (the contract is in `connectfy-shared`). This
+   service writes one row per event, and the owner reads their own log over TCP. See
+   `claude/docs/plans/user_activity_log_plan.md`.
 
 It also keeps a local read model of users (`projection/user`, fed by
 `projection.user.created|updated|removed`), used to populate `actorId` on notifications without
@@ -25,7 +30,8 @@ connectfy-notification-action-history/
 │   ├── interceptors/          # logged-user.interceptor.ts (CLS)
 │   ├── modules/
 │   │   ├── email/             # mail.send consumer, sent-mail dedupe
-│   │   └── notification/      # inbox: entity, repo, dto, controller, service
+│   │   ├── notification/      # inbox: entity, repo, dto, controller, service
+│   │   └── user-activity/     # activity log: entity, repo (+ repo module), dto, controller, service
 │   └── projection/user/       # read model of auth's users
 ├── Dockerfile.dev
 └── docker-compose.*.yml
@@ -97,6 +103,29 @@ Indexes:
   `group_join_requests`. One row per (group, admin).
 - `{expiresAt}`: TTL.
 
+### `user_activity`
+
+- `_id`: the producing event's `eventId`. That makes it the idempotency key, so a redelivery
+  writes nothing.
+- `userId`: the log's owner.
+- `action` (`UserActivityAction`, 36 values), `category` (derived from `action` via
+  `USER_ACTIVITY_CATEGORY`, never sent by the producer), `actorType` (`self` or `system`).
+- `at`, `targetIds` (other users the row names).
+- `details`: its shape depends on `action`, with before/after values where they apply.
+- `device`.
+- `expiresAt`: `at` + 730 days for security and account rows, + 365 for the rest.
+- Append-only: every field is immutable, and there are no timestamps.
+
+Indexes:
+
+- `user_activity_page`: `{userId, at: -1, _id: -1}`. The unfiltered keyset page, and the purge.
+- `user_activity_page_by_category`: `{userId, category, at: -1, _id: -1}`. A filtered page (a
+  `SORT_MERGE` over the chosen categories).
+- `user_activity_ttl`: `{expiresAt}`, TTL.
+
+A purged account (`projection.user.removed`) loses its own log. Rows in other users' logs that
+name it stay, and read as "Connectfy User".
+
 ## Core Features
 
 - Kafka-fed email sending, deduplicated by `mailId`.
@@ -107,6 +136,8 @@ Indexes:
 - Daily friend-birthday notifications, removed once their day has passed.
 - Group join-request rows for each group's admins, synced from messenger's state.
 - Live delivery through the gateway (`notification.created`, `notification.removed`).
+- The user activity log: one row per `activity.recorded`, the owner-only paged read, retention
+  by TTL.
 
 ## APIs
 
@@ -120,7 +151,8 @@ Consumed:
 | `notification.friendship.created` | relationship | request sent → upsert; accepted → insert once per `eventId` |
 | `notification.session.login` | auth (outbox) | new-device sign-in, once per `eventId` |
 | `notification.group.join_requests` | messenger | sync a group's join-request rows (below) |
-| `projection.user.created/updated/removed` | auth | user read model |
+| `projection.user.created/updated/removed` | auth | user read model (`removed` also deletes the user's own inbox and activity log) |
+| `activity.recorded` | auth, account (outbox); relationship, messenger | one activity row per `eventId` (upsert); an invalid event is dead-lettered |
 
 Produced:
 
@@ -142,6 +174,14 @@ Produced:
   Returns the id it changed, or null.
 - `notification/birthday/create`, `notification/birthday/purge`: the daily sweep from
   `connectfy-cron-jobs`. Birthday rows are deleted once their day has passed.
+- `activity/find {order?, categories?, cursor?}`: one page (30) of the **caller's own** activity
+  log. The owner comes from `_loggedUser`, never the payload.
+  - Paging: `(at, _id)` keyset in either order, cursor `<ms>_<id>`.
+  - Reply: `{items, users, nextCursor}`.
+  - Rounds: the page, then the people it names (projection + account's privacy-aware avatars, in
+    parallel). The second round is skipped when the page names nobody.
+  - Non-ACTIVE users come back as `{isDeactivated: true}`; purged users are absent.
+  - Gateway: `GET /api/v1/notification-action-history/activity?order=&categories=a,b&cursor=`.
 
 ## Technologies Used
 

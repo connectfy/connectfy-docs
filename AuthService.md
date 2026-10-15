@@ -160,3 +160,12 @@ This service exposes TCP message patterns, not REST endpoints.
 - This service is the source of truth for identity and session state.
 - `projection.user.created|updated|removed` events are critical; account and relationship depend on them.
 - Email delivery is asynchronous through Kafka topic `mail.send`.
+- User activity log (since 2026-10-15): auth writes the security and account rows to `activity.recorded`
+  through its outbox. Rows that describe a change sit in that change's transaction (reactivation,
+  deactivation, deletion, restore, username/email/phone).
+  - Sign-in: `saveTokens` takes a required `signIn` (`null` for a token refresh), so every
+    credential login is a row. Its optional `follows` keeps it at least 1 ms after a signed-up,
+    reactivated or restored row.
+  - `device` is set only on session rows (sign-in, sign-out, revoke, trust).
+  - Producers key the topic by `userId`.
+  - See `claude/docs/plans/user_activity_log_plan.md`.

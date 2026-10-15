@@ -172,6 +172,15 @@ Kafka consumers:
 - `projection.user.updated`
 - `projection.user.removed`
 
+Kafka produced (user activity log, since 2026-10-15):
+- `activity.recorded` through the outbox, in the change's own transaction, for:
+  - profile edits (changed fields only);
+  - avatar photo changes (only when the MinIO key changes);
+  - social links added, URL or platform changed, and removed;
+  - privacy settings changed (changed keys only).
+- An unchanged save writes no row. The before/after values come from the read each method already
+  did, so there is no extra round trip.
+
 ## Technologies Used
 - NestJS microservices
 - MongoDB + Mongoose

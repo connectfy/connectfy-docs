@@ -89,6 +89,17 @@ Kafka consumers:
 - `projection.user.updated`
 - `projection.user.removed`
 
+Kafka produced (user activity log, since 2026-10-15):
+- `activity.recorded`, `emitSafe` after the graph write (there is no outbox here).
+- In the actor's log only:
+  - friend request sent, cancelled, accepted (accept-all is one row) and declined;
+  - unfriended;
+  - blocked and unblocked.
+- A cancel, decline or unfriend that removed nothing writes no row.
+  `FriendshipRepository.rejectOrCancelRequest`/`unfriend` now return whether something was
+  deleted. The old `records.length > 0` was always true, because an aggregate always returns a
+  record.
+
 ## Technologies Used
 - NestJS microservices
 - MongoDB + Mongoose
