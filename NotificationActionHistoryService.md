@@ -15,6 +15,7 @@
    Every producer publishes `activity.recorded` (the contract is in `connectfy-shared`). This
    service writes one row per event, and the owner reads their own log over TCP. See
    `claude/docs/plans/user_activity_log_plan.md`.
+4. **Web Push** (since 2026-10-19). It stores one subscription per browser (`push_subscriptions`) and sends with `web-push` (VAPID keys from env). The sender is `PushSenderService.sendToUsers`. See `claude/docs/plans/push_notifications_plan.md`.
 
 It also keeps a local read model of users (`projection/user`, fed by
 `projection.user.created|updated|removed`), used to populate `actorId` on notifications without
@@ -103,6 +104,12 @@ Indexes:
   `group_join_requests`. One row per (group, admin).
 - `{expiresAt}`: TTL.
 
+### `push_subscriptions`
+
+- `_id` (UUID), `userId`, `deviceId` (the auth session's `x-device-id`), `endpoint`, `keys {p256dh, auth}`, `userAgent`, `createdAt`, `lastSuccessAt`.
+- Indexes: `uniq_push_endpoint` (unique: a re-subscribe or another account on the same browser takes the row over), `push_by_user`, `push_by_session {userId, deviceId}`.
+- A send deletes rows the push service answers 404/410 for, in one `bulkWrite` with the `lastSuccessAt` updates. `projection.user.removed` deletes the user's rows.
+
 ### `user_activity`
 
 - `_id`: the producing event's `eventId`. That makes it the idempotency key, so a redelivery
@@ -153,6 +160,7 @@ Consumed:
 | `notification.group.join_requests` | messenger | sync a group's join-request rows (below) |
 | `projection.user.created/updated/removed` | auth | user read model (`removed` also deletes the user's own inbox and activity log) |
 | `activity.recorded` | auth, account (outbox); relationship, messenger | one activity row per `eventId` (upsert); an invalid event is dead-lettered |
+| `auth.session.expired` | auth | delete that session's push subscriptions (`{userId, deviceId}`) |
 
 Produced:
 
@@ -162,6 +170,8 @@ Produced:
 | `notification.removed` | `{recipientId, ids, unreadRemoved}` | gateway → `notification:removed` |
 
 ### TCP patterns (called by the gateway)
+
+- `push/publicKey`, `push/subscribe {endpoint, keys, deviceId, userAgent?}` (the endpoint must be on a known push-service host), `push/unsubscribe {endpoint}` (the caller's own row), `push/test` (development only).
 
 - `notification/all`: the inbox, paginated. Cancelled/declined friendship requests are excluded
   by default. Usernames and avatars are re-resolved in batch on read.

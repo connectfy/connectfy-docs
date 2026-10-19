@@ -119,6 +119,13 @@ Base prefix: `/api/v1`
 - `POST /relationship/friendship/update-notification`
 - `POST /files/presigned-upload`
 
+### Web Push (since 2026-10-19, `modules/notification-action-history/push`)
+All behind `AuthGuard`, forwarded to notification-action-history (`push/*` TCP patterns):
+- `GET /push/public-key`: the VAPID public key (null when the service has no keys).
+- `POST /push/subscription {endpoint, keys}`: upsert this browser's subscription. `deviceId` comes from `CLS_KEYS.DEVICE_ID` and the user agent from the request header, never from the body. POST, not PUT: CORS `methods` has no PUT.
+- `DELETE /push/subscription {endpoint}`: the caller's own row only.
+- `POST /push/test`: development only (refused in production).
+
 ## Technologies Used
 - NestJS
 - Redis + `connect-redis`

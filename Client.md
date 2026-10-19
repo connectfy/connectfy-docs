@@ -63,6 +63,7 @@ There are no persistence entities in the client. Important runtime models are:
 - General, privacy, notification, account, and background settings
 - Activity log (since 2026-10-15): the user's own actions, shown at Settings → "Activity log" and in a modal from the profile's Security card. Both use the same `ActivityLogView`.
 - Messenger shell and navigation
+- Desktop push notifications (since 2026-10-19): per device, from Notification Settings. `public/sw.js` shows them and routes clicks; `common/push/` handles support detection, activation/deactivation, re-sync on sign-in and local unsubscribe on sign-out. Push needs HTTPS or `localhost`, so plain-HTTP LAN access shows it as unavailable. Plan: `claude/docs/plans/push_notifications_plan.md`.
 - Global modal system, skeleton loaders, and context menus
 
 ## APIs
