@@ -19,7 +19,7 @@ connectfy-file-uploader/
 ## Architecture & Flow
 1. On startup, the service initializes MinIO and ensures the configured bucket exists.
 2. It applies a public read bucket policy and creates a second MinIO client for browser-accessible presigned URLs.
-3. It connects a Kafka producer and consumer.
+3. It starts the HTTP server, then connects the Kafka producer and consumer in the background (retry with backoff, up to 30 s), so a late Kafka never blocks the presigned-URL routes.
 4. The consumer listens to `profile.file.delete` and removes matching objects from MinIO.
 5. HTTP routes provide upload, batch read, and batch delete operations.
 
