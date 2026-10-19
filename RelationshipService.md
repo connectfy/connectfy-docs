@@ -81,7 +81,9 @@ TCP message patterns:
 - `friendship/updateNotification`
 - `friendship/findManyInternal`
 - `friendship/findOneInternalWithCount`
-- `friendship/findFriends`
+- `friendship/findFriends` (`groupInviteEligible: true` leaves out friends whose `groupInvitePrivacy` is NOBODY, or with a block: the group member picker's list)
+- `friendship/searchGroupInviteCandidates {search, skip, limit}` (the group member picker's search: every user the CLS user may add: EVERYONE or unset anyone, MY_FRIENDS only with a FRIEND edge from them, never NOBODY, a block, themselves or a non-ACTIVE account; one Cypher over the `user_search_index` full-text index (username, fullName; word-prefix, case-insensitive, created by this service's `Neo4jModule` on boot), then the page's privacy-aware avatars in one batch)
+- `friendship/findGroupInviteEligibleIds` (messenger's create-group / add-members check; a refusal there is a 403 with `additional.refusedUserIds` and the localized `exception_messages.group_invite_not_allowed`)
 - `friendship/findRequests`
 
 Kafka consumers:

@@ -125,6 +125,20 @@ All behind `AuthGuard`, forwarded to notification-action-history (`push/*` TCP p
 - `POST /push/subscription {endpoint, keys}`: upsert this browser's subscription. `deviceId` comes from `CLS_KEYS.DEVICE_ID` and the user agent from the request header, never from the body. POST, not PUT: CORS `methods` has no PUT.
 - `DELETE /push/subscription {endpoint}`: the caller's own row only.
 - `POST /push/test`: development only (refused in production).
+- **Call pushes (Phase 5):** `ChatGateway` decides what happened to a 1:1 call and tells
+  notification-action-history over TCP without waiting (`CallPushNotifier` → `push/call {kind,
+  callId, chatId, callerUserId, calleeUserId}`):
+  - `incoming` after `call:invite`, unless the callee is already on a call;
+  - `answered` on the first `call:answer`; `declined` on `call:decline`;
+  - `missed` on `call:cancel`, `call:busy`, a `call:left`/`call:hangup` while it rings, the
+    caller's socket going away before an answer, and the registry's 50 s ring deadline.
+  `GroupCallsService.start` sends `push/groupCall {callId, chatId, chatName, startedBy, userIds:
+  ringUserIds}`.
+- **Pending-invite replay:** `CallSessionRegistry` keeps the sealed invite while the call rings
+  (`ringingByCallee` index, cleared on answer, refusal, end or the 50 s deadline). A socket that
+  sends `call:pending` gets every invite still ringing for its user, emitted to that socket only,
+  so a tab opened from the push can still answer. A `call:left` while ringing (the caller's own
+  no-answer) and the deadline both send the callee `call:cancel {reason: 'no-answer'}`.
 
 ## Technologies Used
 - NestJS
