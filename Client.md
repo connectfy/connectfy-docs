@@ -81,7 +81,7 @@ Main routes:
 - `/messenger`
 - `/profile`
 - `/users`, `/users/search`, `/users/friends`, `/users/requests`, `/users/profile/:id`
-- `/settings`, `/settings/general`, `/settings/account`, `/settings/privacy`, `/settings/notification`, `/settings/background`, `/settings/activity-log`
+- `/settings`, `/settings/general`, `/settings/account`, `/settings/privacy`, `/settings/notification`, `/settings/theme` (old `/settings/background` redirects), `/settings/activity-log`
 - `/terms-and-conditions`
 
 ## Technologies Used
