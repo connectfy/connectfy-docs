@@ -15,7 +15,7 @@
    Every producer publishes `activity.recorded` (the contract is in `connectfy-shared`). This
    service writes one row per event, and the owner reads their own log over TCP. See
    `claude/docs/plans/user_activity_log_plan.md`.
-4. **Web Push** (since 2026-10-19). It stores one subscription per browser (`push_subscriptions`) and sends with `web-push` (VAPID keys from env). The sender is `PushSenderService.sendToUsers`. See `claude/docs/plans/push_notifications_plan.md`.
+4. **Web Push** (since 2026-10-19). Every push goes through `PushDispatcherService` (devices → account `settings/pushPrefs` → per-user rules → Redis dedupe → send). Messages come from `push.message`. Friend requests received and new group join requests (to admins, not muted) push straight from the handlers that write their bell rows; other bell kinds don't push. It stores one subscription per browser (`push_subscriptions`) and sends with `web-push` (VAPID keys from env). The sender is `PushSenderService.sendToUsers`. See `claude/docs/plans/push_notifications_plan.md`.
 
 It also keeps a local read model of users (`projection/user`, fed by
 `projection.user.created|updated|removed`), used to populate `actorId` on notifications without
@@ -161,6 +161,7 @@ Consumed:
 | `projection.user.created/updated/removed` | auth | user read model (`removed` also deletes the user's own inbox and activity log) |
 | `activity.recorded` | auth, account (outbox); relationship, messenger | one activity row per `eventId` (upsert); an invalid event is dead-lettered |
 | `auth.session.expired` | auth | delete that session's push subscriptions (`{userId, deviceId}`) |
+| `push.message` | messenger | message push: devices → account `settings/pushPrefs` → rules (`message-push.rules.ts`) → Redis dedupe on `eventId` → send |
 
 Produced:
 
