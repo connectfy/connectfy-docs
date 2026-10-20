@@ -54,6 +54,7 @@ This service does not own database entities. Its core runtime models are:
 - Refresh-token cookie handling.
 - Request context propagation to downstream services.
 - Redis-backed caching for repeated auth checks.
+- Runs as two instances behind nginx (`ip_hash`): Socket.IO rooms go through the Redis adapter, and 1:1 call state, group-call presence and the media-change lock live in Redis (see Notes).
 
 ## APIs
 Base prefix: `/api/v1`
@@ -135,14 +136,14 @@ All behind `AuthGuard`, forwarded to notification-action-history (`push/*` TCP p
   `GroupCallsService.start` sends `push/groupCall {callId, chatId, chatName, startedBy, userIds:
   ringUserIds}`.
 - **Pending-invite replay:** `CallSessionRegistry` keeps the sealed invite while the call rings
-  (`ringingByCallee` index, cleared on answer, refusal, end or the 50 s deadline). A socket that
+  (a per-callee Redis set, cleared on answer, refusal, end or the 50 s deadline, which is a Redis sorted set drained by every instance). A socket that
   sends `call:pending` gets every invite still ringing for its user, emitted to that socket only,
   so a tab opened from the push can still answer. A `call:left` while ringing (the caller's own
   no-answer) and the deadline both send the callee `call:cancel {reason: 'no-answer'}`.
 
 ## Technologies Used
 - NestJS
-- Redis + `connect-redis`
+- Redis + `connect-redis`, `@socket.io/redis-adapter`
 - JWT
 - `nestjs-cls`
 - TCP microservices
@@ -154,3 +155,10 @@ All behind `AuthGuard`, forwarded to notification-action-history (`push/*` TCP p
 - The gateway is intentionally thin: business rules live in downstream services.
 - `AuthGuard` trusts both an access token and a persisted refresh token/device session.
 - Session storage is used for short-lived verification flows, not primary user data.
+- **Multi-instance (since 2026-10-20, [v1.73.0](../claude/docs/versions/v1.73.0_multi_instance_gateway.md)):** two gateways (`:3000`, `:3001`) sit behind nginx with `ip_hash`.
+  - Socket.IO uses `@socket.io/redis-adapter`, so any room emit, `fetchSockets()` or `disconnect()` reaches every instance.
+  - `CallSessionRegistry` (1:1 calls, busy, pending invites, ring deadlines) and `GroupCallPresenceRegistry` are Redis-backed, atomic through Lua; their API is async.
+  - Each ring deadline fires once cluster-wide (the sweeper on every instance claims with `ZREM`).
+  - `GroupCallsService.serializeMedia` takes a `RedisLockService` lock per `callId:userId`; a wait over 5 s gives a 503.
+  - LiveKit's webhook goes through nginx (`:8080`), so either instance can handle it.
+  - New realtime state must go in Redis, never in process memory.
