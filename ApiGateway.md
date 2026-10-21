@@ -155,7 +155,7 @@ All behind `AuthGuard`, forwarded to notification-action-history (`push/*` TCP p
 - The gateway is intentionally thin: business rules live in downstream services.
 - `AuthGuard` trusts both an access token and a persisted refresh token/device session.
 - Session storage is used for short-lived verification flows, not primary user data.
-- **Multi-instance (since 2026-10-20, [v1.73.0](../claude/docs/versions/v1.73.0_multi_instance_gateway.md)):** two gateways (`:3000`, `:3001`) sit behind nginx with `ip_hash`.
+- **Multi-instance (since 2026-10-20, [v1.73.0](../claude/docs/versions/v1.73.0_multi_instance_gateway.md)):** two gateways (`:3000`, `:3001`) sit behind nginx with `ip_hash` in development. Production runs **one** instance for the MVP (2026-10-21, `docker-compose.prod.yml`); adding the second back is a compose service plus an upstream server, with no code change.
   - Socket.IO uses `@socket.io/redis-adapter`, so any room emit, `fetchSockets()` or `disconnect()` reaches every instance.
   - `CallSessionRegistry` (1:1 calls, busy, pending invites, ring deadlines) and `GroupCallPresenceRegistry` are Redis-backed, atomic through Lua; their API is async.
   - Each ring deadline fires once cluster-wide (the sweeper on every instance claims with `ZREM`).
